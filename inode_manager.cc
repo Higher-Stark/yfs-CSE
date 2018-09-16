@@ -10,11 +10,13 @@ disk::disk()
 void
 disk::read_block(blockid_t id, char *buf)
 {
+  memcpy(buf, &(blocks[id][0]), BLOCK_SIZE);
 }
 
 void
 disk::write_block(blockid_t id, const char *buf)
 {
+  memcpy(&(blocks[id][0]), buf, strlen(buf) > BLOCK_SIZE ? BLOCK_SIZE : strlen(buf));
 }
 
 // block layer -----------------------------------------
@@ -28,8 +30,19 @@ block_manager::alloc_block()
    * note: you should mark the corresponding bit in block bitmap when alloc.
    * you need to think about which block you can start to be allocated.
    */
-
-  return 0;
+  uint32_t block_id = 0;
+  for (std::map<uint32_t, int>::iterator it = using_blocks.begin(); it != using_blocks.end(); it++) {
+    if (it->second == 0) {
+      block_id = it->second;
+      char bit_buf[BLOCK_SIZE];
+      d->read_block(block_id, bit_buf);
+      uint32_t byte_offset = block_id / 8;
+      short bit_offset = block_id % 8;
+      bit_buf[byte_offset] = bit_buf[byte_offset] && (1 << bit_offset);
+      d->write_block(block_id, bit_buf);
+    }
+  }
+  return block_id;
 }
 
 void
