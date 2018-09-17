@@ -33,13 +33,14 @@ block_manager::alloc_block()
   uint32_t block_id = 0;
   for (std::map<uint32_t, int>::iterator it = using_blocks.begin(); it != using_blocks.end(); it++) {
     if (it->second == 0) {
-      block_id = it->second;
+      block_id = it->first;
       char bit_buf[BLOCK_SIZE];
-      d->read_block(block_id, bit_buf);
+      d->read_block(BBLOCK(block_id), bit_buf);
       uint32_t byte_offset = block_id / 8;
       short bit_offset = block_id % 8;
-      bit_buf[byte_offset] = bit_buf[byte_offset] && (1 << bit_offset);
-      d->write_block(block_id, bit_buf);
+      bit_buf[byte_offset] = bit_buf[byte_offset] | (1 << bit_offset);
+      d->write_block(BBLOCK(block_id), bit_buf);
+      it->second = 1;
     }
   }
   return block_id;
@@ -52,7 +53,14 @@ block_manager::free_block(uint32_t id)
    * your code goes here.
    * note: you should unmark the corresponding bit in the block bitmap when free.
    */
-  
+  using_blocks[id] = 0;
+
+  char bit_buf[BLOCK_SIZE];
+  d->read_block( BBLOCK(id), bit_buf );
+  uint32_t byte_offset = id / 8;
+  short bit_offset = block_id % 8;
+  bit_buf[byte_offset] = bit_buf[byte_offset] & (0xff ^ ( 1 << bit_offset));
+  d->write_block( BBLOCK(id), bit_buf);
   return;
 }
 
@@ -103,6 +111,19 @@ inode_manager::alloc_inode(uint32_t type)
    * note: the normal inode block should begin from the 2nd inode block.
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
+  blockid_t bid = bm->alloc_block();
+  
+  // bm->read_block(IBLOCK(bid, BLOCK_NUM), iblock);
+  inode_t node;
+  node.type = type;
+  node.size = 0;
+  std::time_t time = std::time(0);
+  node.atime = time;
+  node.mtime = time;
+  node.ctime = time;
+  node.blocks[0] = bid;
+  //memcpy(iblock, &node, sizeof(struct inode));
+  bm->write_block(IBLOCK(bid, BLOCK_NUM), (const char *)&node);
   return 1;
 }
 
