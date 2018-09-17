@@ -42,6 +42,7 @@ block_manager::alloc_block()
       bit_buf[byte_offset] = bit_buf[byte_offset] | (1 << bit_offset);
       d->write_block(BBLOCK(block_id), bit_buf);
       it->second = 1;
+      break;
     }
   }
   return block_id;
@@ -112,31 +113,7 @@ inode_manager::alloc_inode(uint32_t type)
    * note: the normal inode block should begin from the 2nd inode block.
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
-  /*
-  blockid_t bid = bm->alloc_block();
-  
-  inode_t node;
-  node.type = type;
-  node.size = 0;
-  std::time_t time = std::time(0);
-  node.atime = time;
-  node.mtime = time;
-  node.ctime = time;
-  node.blocks[0] = bid;
-
-  int inum = 0;
-  struct inode* ino = get_inode(inum);
-  while ( ino ){
-    free(ino);
-    inum++;
-    ino = get_inode(inum);
-  }
-  if (inum < 0 || inum >= INODE_NUM) inum = -1;
-  else put_inode(inum, &node);
-  return inum;
-  */
-  uint32_t i = 0;
-  for (; i != INODE_NUM; i++) {
+  for (uint32_t i = 1; i != INODE_NUM; i++) {
     if (!get_inode(i)) {
       struct inode ino;
       ino.type = type;
