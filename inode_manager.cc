@@ -11,13 +11,21 @@ disk::disk()
 void
 disk::read_block(blockid_t id, char *buf)
 {
+  printf("read block start... ");
+  fflush(stdout);
   memcpy(buf, blocks[id], BLOCK_SIZE);
+  printf("read block done !");
+  fflush(stdout);
 }
 
 void
 disk::write_block(blockid_t id, const char *buf)
 {
+  printf("write block start... ");
+  fflush(stdout);
   memcpy(blocks[id], buf, BLOCK_SIZE);
+  printf("write block done !");
+  fflush(stdout);
 }
 
 // block layer -----------------------------------------
@@ -132,6 +140,7 @@ inode_manager::alloc_inode(uint32_t type)
    * the 1st is used for root_dir, see inode_manager::inode_manager().
    */
   for (uint32_t i = 1; i != INODE_NUM; i++) {
+    fflush(stdout);
     if (!get_inode(i)) {
       struct inode ino;
       memset(&ino, 0, sizeof(struct inode));
@@ -305,18 +314,22 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
    * you need to consider the situation when the size of buf 
    * is larger or smaller than the size of original inode
    */
+  printf("\tim: write file %d\n", inum);
+  fflush(stdout);
   struct inode *ino = get_inode(inum);
 
   // update modify time
   std::time_t t = std::time(0);
   ino->mtime = t;
 
-  printf("\tim: <write file : [%d bytes]> %s\n",size, buf);
+  printf("\tim: <write file : [%d bytes]>\n",size);
+  fflush(stdout);
   blockid_t *blocks = ino->blocks;
   int blks_old = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
   int blks_new = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
   printf("\tim: file original size: %d blocks, new size: %d blocks\n", blks_old, blks_new);
+  fflush(stdout);
 
   // buf needs more blocks
   if (blks_new > blks_old) {
