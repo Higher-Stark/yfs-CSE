@@ -66,7 +66,7 @@ bool
 yfs_client::isdir(inum inum)
 {
     // Oops! is this still correct when you implement symlink?
-    // TODO :  revamp when it is time
+    // TODO:  revamp when it is time
     return ! isfile(inum);
 }
 
@@ -145,7 +145,22 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
      * note: lookup is what you need to check if file exist;
      * after create file or dir, you must remember to modify the parent infomation.
      */
-
+    bool found = false;
+    inum file_inum;
+    r = lookup(parent, name, found, file_inum);
+    if (r == OK && found) {
+        r = EXIST;
+    }
+    else {
+        std::list<dirent> entries;
+        readdir(parent, entries);
+        ec->create(mode, ino_out);
+        dirent entry;
+        entry.inum = ino_out;
+        entry.name = name;
+        entries.push_back(entry);
+        ec->put(parent, *((std::string *) &entries));
+    }
     return r;
 }
 
@@ -173,7 +188,16 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
      * note: lookup file from parent dir according to name;
      * you should design the format of directory content.
      */
-
+    found = false;
+    std::list<dirent> entries = std::list<dirent>();
+    readdir(parent, entries);
+    for (std::list<dirent>::iterator it = entries.begin(); 
+        it != entries.end(); it++) {
+        if (it->name.compare(name) == 0) {
+            ino_out = it->inum;
+            found = true;
+        }
+    }
     return r;
 }
 
@@ -187,6 +211,9 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
      * note: you should parse the dirctory content using your defined format,
      * and push the dirents to the list.
      */
+    std::string content;
+    ec->get(dir, content);
+    list = *((std::list<dirent> *) &content);
 
     return r;
 }
