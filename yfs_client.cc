@@ -215,6 +215,8 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      * when off > length of original file, fill the holes with '\0'.
      */
 
+    // data contains \0 before end, construct string with two params.
+
     return r;
 }
 

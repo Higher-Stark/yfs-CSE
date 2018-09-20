@@ -251,8 +251,6 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
 
   *size = ino->size;
   
-  printf("\tim: inode size: %d\n", ino->size);
-
   blockid_t i = 0;
   int rest = ino->size;
   int offset = 0;
