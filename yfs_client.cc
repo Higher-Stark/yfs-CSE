@@ -66,6 +66,7 @@ bool
 yfs_client::isdir(inum inum)
 {
     // Oops! is this still correct when you implement symlink?
+    // TODO :  revamp when it is time
     return ! isfile(inum);
 }
 
