@@ -154,7 +154,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
     else {
         std::list<dirent> entries;
         readdir(parent, entries);
-        ec->create(mode, ino_out);
+        ec->create(extent_protocol::T_FILE, ino_out);
         dirent entry;
         entry.inum = ino_out;
         entry.name = name;
@@ -174,7 +174,23 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
      * note: lookup is what you need to check if directory exist;
      * after create file or dir, you must remember to modify the parent infomation.
      */
-
+    bool found = false;
+    inum file_inum;
+    r = lookup(parent, name, found, file_inum);
+    if (r == OK && found) {
+        r = EXIST;
+    }
+    else {
+        std::list<dirent> entries;
+        readdir(parent, entries);
+        ec->create(extent_protocol::T_DIR, ino_out);
+        dirent entry;
+        entry.inum = ino_out;
+        entry.name = name;
+        entries.push_back(entry);
+        ec->put(parent, *((std::string *) &entries));
+    }
+    
     return r;
 }
 
