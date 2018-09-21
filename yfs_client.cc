@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string>
 
 yfs_client::yfs_client()
 {
@@ -159,7 +160,15 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
         entry.inum = ino_out;
         entry.name = name;
         entries.push_back(entry);
-        ec->put(parent, *((std::string *) &entries));
+
+        // format directory entries
+        std::string content;
+        for (std::list<dirent>::iterator it = entries.begin(); it != entries.end(); it++) {
+            std::ostringstream stream;
+            stream << it->name << "\\:" << it->inum << "\\;";
+            content += stream.str();
+        }
+        ec->put(parent, content);
     }
     return r;
 }
@@ -188,7 +197,15 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
         entry.inum = ino_out;
         entry.name = name;
         entries.push_back(entry);
-        ec->put(parent, *((std::string *) &entries));
+        
+        // format directory entries
+        std::string content;
+        for (std::list<dirent>::iterator it = entries.begin(); it != entries.end(); it++) {
+            std::ostringstream stream;
+            stream << it->name << "\\:" << it->inum << "\\;";
+            content += stream.str();
+        }
+        ec->put(parent, content);
     }
     
     return r;
@@ -227,9 +244,26 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
      * note: you should parse the dirctory content using your defined format,
      * and push the dirents to the list.
      */
-    std::string content;
-    ec->get(dir, content);
-    list = *((std::list<dirent> *) &content);
+    std::string buf;
+    ec->get(dir, buf);
+    std::string::size_type pos1 = 0;
+    std::string::size_type pos2 = buf.find("\\;", pos1);
+    while (pos2 != buf.npos && pos1 != pos2) {
+        std::string ss = buf.substr(pos1, pos2);
+        std::string::size_type subpos1 = 0;
+        std::string::size_type subpos2 = ss.find("\\:");
+        struct dirent entry;
+        entry.name = ss.substr(subpos1, subpos2);
+        subpos1 = subpos2 + 2;
+        subpos2 = ss.size();
+        std::string inum_str = ss.substr(subpos1, subpos2);
+        std::istringstream stream(inum_str);
+        stream >> entry.inum;
+        list.push_back(entry);
+
+        pos1 = pos2 + 2;
+        pos2 = buf.find("\\;", pos1);
+    }
 
     return r;
 }
