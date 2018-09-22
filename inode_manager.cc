@@ -137,10 +137,12 @@ inode_manager::alloc_inode(uint32_t type)
       struct inode ino;
       memset(&ino, 0, sizeof(struct inode));
       ino.type = type;
-      std::time_t t = std::time(0);
+      std::time_t t = std::time(NULL);
       ino.atime = t;
       ino.mtime = t;
       ino.ctime = t;
+      printf("\tim: inode[%d] { atime: %d, mtime: %d, ctime: %d }\n", i, ino.atime, ino.mtime, ino.ctime);
+      fflush(stdout);
       put_inode(i, &ino);
       return i;
     }
@@ -245,6 +247,10 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
     *size = 0;
     return;
   }
+  
+  std::cout << "\tim: read file: inode=" << inum 
+    << ", original size=" << ino->size << std::endl;
+  fflush(stdout);
   // update access time
   std::time_t t = std::time(0);
   ino->atime = t;
@@ -254,7 +260,7 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
   blockid_t i = 0;
   int rest = ino->size;
   int offset = 0;
-  int nblks = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int nblks = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
   char *file_buf = (char *)malloc(sizeof(char) * BLOCK_SIZE * nblks);
   while (rest > 0 && i < MIN(NDIRECT, nblks)) {
     // char block_buf[BLOCK_SIZE];
@@ -274,7 +280,7 @@ inode_manager::read_file(uint32_t inum, char **buf_out, int *size)
 
     // traverse indirect block index 
     uint *indir_blk = (uint *)block_buf;
-    for (int j = 0; j != nblks - NDIRECT; j++) {
+    for (unsigned int j = 0; j != nblks - NDIRECT; j++) {
       if (rest > 0 && indir_blk[j] > 0) {
         char buffer[BLOCK_SIZE];
         bm->read_block(indir_blk[j], buffer);
@@ -307,21 +313,25 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     printf("Error: File not exists\n");
     return;
   }
+  printf("\tim-write_file 0: inode[%d] { atime: %d, mtime: %d, ctime: %d }\n", inum, ino->atime, ino->mtime, ino->ctime);
+  fflush(stdout);
 
   // update modify time
-  std::time_t t = std::time(0);
-  ino->mtime = t;
+  std::time_t t;
+
+  printf("\tim: write file: inode=%d, size=%d\n", inum, size);
+  fflush(stdout);
 
   blockid_t *blocks = ino->blocks;
-  int blks_old = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
-  int blks_new = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int blks_old = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  unsigned int blks_new = (size + BLOCK_SIZE - 1) / BLOCK_SIZE;
 
   // buf needs more blocks
   if (blks_new > blks_old) {
     // fill old blocks with new data
     int offset = 0;
-    int i = 0;
-    int maxIdx = MIN(blks_old, NDIRECT);
+    unsigned int i = 0;
+    unsigned int maxIdx = MIN(blks_old, NDIRECT);
     for (; i != maxIdx; i++) {
       bm->write_block(blocks[i], buf + offset);
       offset += BLOCK_SIZE;
@@ -330,7 +340,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
       char blockid_buf[BLOCK_SIZE];
       bm->read_block(blocks[NDIRECT], blockid_buf);
       blockid_t *indir_blks = (blockid_t *)indir_blks;
-      for (int j = 0; j != blks_old - NDIRECT; j++) {
+      for (unsigned int j = 0; j != blks_old - NDIRECT; j++) {
         bm->write_block(indir_blks[j], buf + offset);
         offset += BLOCK_SIZE;
         i++;
@@ -373,8 +383,8 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
   else {
     int offset = 0;
     int rest = size;
-    int maxIdx = MIN(blks_new, NDIRECT);
-    int i = 0;
+    unsigned int maxIdx = MIN(blks_new, NDIRECT);
+    unsigned int i = 0;
     for (; i != maxIdx && rest > 0; i++) {
       bm->write_block(blocks[i], buf + offset);
       offset += BLOCK_SIZE;
@@ -415,6 +425,13 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     }
   }
   ino->size = size;
+  t = std::time(NULL);
+  ino->ctime = t;
+  t = std::time(NULL);
+  ino->mtime = t;
+  printf("\tim-write_file 0: inode[%d] { atime: %d, mtime: %d, ctime: %d }\n", inum, ino->atime, ino->mtime, ino->ctime);
+  fflush(stdout);
+
   put_inode(inum, ino);
   free(ino);
   return;

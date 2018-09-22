@@ -388,7 +388,31 @@ int yfs_client::unlink(inum parent,const char *name)
      * note: you should remove the file using ec->remove,
      * and update the parent directory content.
      */
+    std::list<dirent> entries;
+    readdir(parent, entries);
 
+    bool found = false;
+    for (std::list<dirent>::iterator it = entries.begin(); it != entries.end(); it++){
+        if (it->name.compare(name) == 0) {
+            found = true;
+            ec->remove(it->inum);
+            entries.erase(it);
+            break;
+        }
+    }
+
+    if (!found) {
+        r = NOENT;
+    }
+    else {
+        std::string content;
+        for (std::list<dirent>::iterator it = entries.begin(); it != entries.end(); it++) {
+            std::ostringstream stream;
+            stream << it->name << "\\:" << it->inum << "\\;";
+            content += stream.str();
+        }
+        ec->put(parent, content);
+    }
     return r;
 }
 
