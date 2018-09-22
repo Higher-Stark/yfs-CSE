@@ -132,6 +132,29 @@ yfs_client::setattr(inum ino, size_t size)
      * note: get the content of inode ino, and modify its content
      * according to the size (<, =, or >) content length.
      */
+    std::string content;
+    ec->get(ino, content);
+    extent_protocol::attr a;
+    ec->getattr(ino, a);
+    if (a.type == 0) {
+        r = IOERR;
+        return r;
+    }
+
+    std::cout << "> SET ATTR: inode=" << ino 
+        << ", original size=" << a.size 
+        << ", new size=" << size << std::endl;
+    fflush(stdout);
+    if (size > a.size) { 
+        std::string padding(size - a.size, '\0');
+        content += padding;
+        a.size = size;
+    } 
+    else if (size < a.size) {
+        content = content.substr(0, size);
+        a.size = size;
+    }
+    ec->put(ino, content);
 
     return r;
 }
@@ -277,7 +300,30 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
      * your code goes here.
      * note: read using ec->get().
      */
+    std::string content;
+    ec->get(ino, content);
+    extent_protocol::attr a;
+    ec->getattr(ino, a);
+    if (a.type == 0 || a.type == extent_protocol::T_DIR) {
+        r = NOENT;
+        goto end;
+    }
+    std::cout << "> READ: inode=" << ino 
+        << ", file size=" << a.size 
+        << ", offset=" << off 
+        << ", size=" << size << std::endl;
+    fflush(stdout);
+    if (off >= a.size) {
+        data = "";
+        goto end;
+    }
+    if (off + size > a.size) {
+        data = content.substr(off, a.size - off);
+        goto end;
+    }
+    data = content.substr(off, size);
 
+end:
     return r;
 }
 
@@ -294,7 +340,42 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
      */
 
     // data contains \0 before end, construct string with two params.
-
+    std::string new_content(data, size);
+    std::string old_content;
+    extent_protocol::attr a;
+    ec->getattr(ino, a);
+    if (a.type != extent_protocol::T_FILE) {
+        r = IOERR;
+        return r;
+    }
+    std::cout << "> WRITE: inode=" << ino 
+        << ", original size=" << a.size 
+        << ", offset=" << off
+        << ", size=" << size << std::endl;
+    fflush(stdout);
+    ec->get(ino, old_content);
+    // fill the hole with zeros
+    if (off > a.size) {
+        std::string padding(off - a.size, '\0');
+        old_content += padding + new_content;
+    }
+    // append the file
+    else if (off == a.size) {
+        old_content += new_content;
+    }
+    // write into middle of a file
+    else {
+        printf("<Write into middle of a file>\n File size: %d, offset: %ld\n", a.size, off);
+        fflush(stdout);
+        std::string sub = old_content.substr(0, off);
+        sub += new_content;
+        if (off + size < a.size) {
+            sub += old_content.substr(off+size, a.size - off - size);
+        }
+        old_content = sub;
+    }
+    bytes_written = size;
+    ec->put(ino, old_content);
     return r;
 }
 
