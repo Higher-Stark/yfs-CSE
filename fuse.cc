@@ -58,7 +58,7 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_ctime = info.ctime;
         st.st_size = info.size;
         printf("   getattr -> %llu\n", info.size);
-    } else {
+    } else if (yfs->isdir(inum)) {
         yfs_client::dirinfo info;
         ret = yfs->getdir(inum, info);
         if(ret != yfs_client::OK)
@@ -69,6 +69,17 @@ getattr(yfs_client::inum inum, struct stat &st)
         st.st_mtime = info.mtime;
         st.st_ctime = info.ctime;
         printf("   getattr -> %lu %lu %lu\n", info.atime, info.mtime, info.ctime);
+    } else if (yfs->issymlink(inum)) {
+        yfs_client::fileinfo info;
+        ret = yfs->getfile(inum, info);
+        if (ret != yfs_client::OK) return ret;
+        st.st_mode = S_IFLNK | 0777;
+        st.st_nlink = 1;
+        st.st_size = info.size;
+        st.st_atime = info.atime;
+        st.st_ctime = info.ctime;
+        st.st_mtime = info.mtime;
+        printf("   getattr -> symbolic link path length %llu\n", info.size);
     }
     return yfs_client::OK;
 }
@@ -239,8 +250,10 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
     yfs_client::inum inum;
     if ( type == extent_protocol::T_FILE )
 		ret = yfs->create(parent, name, mode, inum);
-	else 
+	else if ( type == extent_protocol::T_DIR)
 		ret = yfs->mkdir(parent,name,mode,inum);
+    else if ( type == extent_protocol::T_SYMLINK )
+        ret = yfs->create_symlink(parent, name, mode, inum);
     if (ret != yfs_client::OK)
         return ret;
     e->ino = inum;
@@ -457,6 +470,46 @@ fuseserver_statfs(fuse_req_t req)
     fuse_reply_statfs(req, &buf);
 }
 
+void fuseserver_symlink(fuse_req_t req, const char *linkname, fuse_ino_t parent, const char *name) 
+{
+    printf("symlink: linkname=%s, parent=%ld, name=%s\n", linkname, parent, name);
+    // char *pathname;
+    int r;
+    struct fuse_entry_param e;
+    if ((r = fuseserver_createhelper(parent, name, 0, &e, extent_protocol::T_SYMLINK)) == yfs_client::OK) {
+        bool found = false;
+        yfs_client::inum inum;
+        yfs->lookup(parent, name, found, inum);
+        
+        size_t bytes_written = 0;
+        if ((r = yfs->write_symlink(inum, linkname)) == yfs_client::OK) {
+            fuse_reply_write(req, bytes_written);
+        }
+        else {
+            fuse_reply_err(req, ENOENT);
+        }
+    }
+    fflush(stdout);
+}
+
+void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) 
+{
+    int r;
+    std::cout << "Readlink: " << ino << std::endl;
+    fflush(stdout);
+    struct stat st;
+    if ((r = getattr(ino, st)) != yfs_client::OK) {
+        fuse_reply_err(req, ENOLINK);
+        return;
+    }
+    std::string path;
+    if ((r = yfs->my_readlink(ino, path, st.st_size)) == yfs_client::OK) {
+        fuse_reply_buf(req, path.data(), path.size());
+    }
+    else 
+        fuse_reply_err(req, ENODATA);
+}
+
 struct fuse_lowlevel_ops fuseserver_oper;
 
 int
@@ -504,6 +557,8 @@ main(int argc, char *argv[])
      * routines here to implement symbolic link,
      * rmdir, etc.
      * */
+    fuseserver_oper.readlink   = fuseserver_readlink;
+    fuseserver_oper.symlink    = fuseserver_symlink;
 
     const char *fuse_argv[20];
     int fuse_argc = 0;

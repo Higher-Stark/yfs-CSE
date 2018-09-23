@@ -54,7 +54,7 @@ yfs_client::isfile(inum inum)
         printf("isfile: %lld is a file\n", inum);
         return true;
     } 
-    printf("isfile: %lld is a dir\n", inum);
+    printf("isfile: %lld is not a file\n", inum);
     return false;
 }
 /** Your code here for Lab...
@@ -63,12 +63,48 @@ yfs_client::isfile(inum inum)
  * 
  * */
 
+int yfs_client::my_readlink(inum inum, std::string &buf, size_t size)
+{
+    printf("my_readlink: %lld, size=%ld bytes\n", inum, size);
+    read(inum, size, 0, buf);
+    return 0;
+}
+
+bool yfs_client::issymlink(inum inum) 
+{
+    extent_protocol::attr a;
+
+    if (ec->getattr(inum, a) != extent_protocol::OK) {
+        printf("error get attr\n");
+        return false;
+    } 
+
+    if(a.type == extent_protocol::T_SYMLINK) {
+        printf("issymlink: %lld is a symbolic link\n", inum);
+        return true;
+    }
+    printf("issymlink: %lld is not a symbolic link\n", inum);
+    return false;
+}
+
 bool
 yfs_client::isdir(inum inum)
 {
     // Oops! is this still correct when you implement symlink?
     // TODO:  revamp when it is time
-    return ! isfile(inum);
+    extent_protocol::attr a;
+
+    if (ec->getattr(inum, a) != extent_protocol::OK) {
+        printf("error get attr\n");
+        return false;
+    }
+
+    if (a.type == extent_protocol::T_DIR) {
+        printf("isdir: %lld is a dir\n", inum);
+        return true;
+    }
+    printf("isdir: %lld is not a dir\n", inum);
+    return false;
 }
 
 int
@@ -235,6 +271,59 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
 }
 
 int
+yfs_client::create_symlink(inum parent, const char *name, mode_t mode, inum &ino_out) 
+{
+    int r = OK;
+
+    bool found = false;
+    inum symlink_inum;
+    r = lookup(parent, name, found, symlink_inum);
+    if (r == OK && found) {
+        r = EXIST;
+        return r;
+    }
+    else {
+        std::list<dirent> entries;
+        readdir(parent, entries);
+        ec->create(extent_protocol::T_SYMLINK, ino_out);
+        dirent entry;
+        entry.inum = ino_out;
+        entry.name = name;
+        entries.push_back(entry);
+
+        // format directory entries
+        std::string content;
+        for (std::list<dirent>::iterator it = entries.begin(); it != entries.end(); it++) {
+            std::ostringstream stream;
+            stream << it->name << "\\:" << it->inum << "\\;";
+            content += stream.str();
+        }
+        ec->put(parent, content);
+    }
+    return r;
+}
+
+int 
+yfs_client::write_symlink(inum ino, const char *linkname) 
+{
+    int r = OK;
+
+    extent_protocol::attr a;
+    std::string content(linkname);
+    ec->getattr(ino, a);
+    if (a.type != extent_protocol::T_SYMLINK) {
+        r = NOENT;
+        return r;
+    }
+    if (a.size > 0) {
+        r = EXIST;
+        return r;
+    }
+    ec->put(ino, content);
+    return r;
+}
+
+int
 yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
 {
     int r = OK;
@@ -254,6 +343,8 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
             found = true;
         }
     }
+    printf("lookup: %s not found\n", name);
+    fflush(stdout);
     return r;
 }
 
