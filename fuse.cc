@@ -250,10 +250,8 @@ fuseserver_createhelper(fuse_ino_t parent, const char *name,
     yfs_client::inum inum;
     if ( type == extent_protocol::T_FILE )
 		ret = yfs->create(parent, name, mode, inum);
-	else if ( type == extent_protocol::T_DIR)
-		ret = yfs->mkdir(parent,name,mode,inum);
-    else if ( type == extent_protocol::T_SYMLINK )
-        ret = yfs->create_symlink(parent, name, mode, inum);
+	else
+		ret = yfs->mkdir(parent, name, mode, inum);
     if (ret != yfs_client::OK)
         return ret;
     e->ino = inum;
@@ -476,20 +474,26 @@ void fuseserver_symlink(fuse_req_t req, const char *linkname, fuse_ino_t parent,
     // char *pathname;
     int r;
     struct fuse_entry_param e;
-    if ((r = fuseserver_createhelper(parent, name, 0, &e, extent_protocol::T_SYMLINK)) == yfs_client::OK) {
-        bool found = false;
-        yfs_client::inum inum;
-        yfs->lookup(parent, name, found, inum);
-        
-        size_t bytes_written = 0;
-        if ((r = yfs->write_symlink(inum, linkname)) == yfs_client::OK) {
-            fuse_reply_write(req, bytes_written);
+    (void) e;
+    yfs_client::inum inum;
+    if ((r = yfs->symlink(parent, linkname, 0, name, inum)) == yfs_client::OK) {
+        struct fuse_entry_param e;
+        // In yfs, timeouts are always set to 0.0, and generations are always set to 0
+        e.attr_timeout = 0.0;
+        e.entry_timeout = 0.0;
+        e.generation = 0;
+        e.ino = inum;
+        getattr(inum, e.attr);
+        fuse_reply_entry(req, &e);
+    }
+    else {
+        if (r == yfs_client::EXIST) {
+            fuse_reply_err(req, EEXIST);
         }
         else {
-            fuse_reply_err(req, ENOENT);
+            fuse_reply_err(req, ENONET);
         }
     }
-    fflush(stdout);
 }
 
 void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) 
@@ -503,11 +507,11 @@ void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino)
         return;
     }
     std::string path;
-    if ((r = yfs->my_readlink(ino, path, st.st_size)) == yfs_client::OK) {
-        fuse_reply_buf(req, path.data(), path.size());
+    if ((r = yfs->readlink(ino, path)) == yfs_client::OK) {
+        fuse_reply_readlink(req, path.data());
     }
     else 
-        fuse_reply_err(req, ENODATA);
+        fuse_reply_err(req, ENONET);
 }
 
 struct fuse_lowlevel_ops fuseserver_oper;

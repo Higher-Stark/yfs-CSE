@@ -63,11 +63,12 @@ yfs_client::isfile(inum inum)
  * 
  * */
 
-int yfs_client::my_readlink(inum inum, std::string &buf, size_t size)
+int yfs_client::readlink(inum inum, std::string &buf)
 {
-    printf("my_readlink: %lld, size=%ld bytes\n", inum, size);
-    read(inum, size, 0, buf);
-    return 0;
+    int r = OK;
+    printf("my_readlink: %lld\n", inum);
+    ec->get(inum, buf);
+    return r;
 }
 
 bool yfs_client::issymlink(inum inum) 
@@ -270,14 +271,13 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
     return r;
 }
 
-int
-yfs_client::create_symlink(inum parent, const char *name, mode_t mode, inum &ino_out) 
+int 
+yfs_client::symlink(inum parent, const char *link, mode_t mode, const char *name, inum &ino_out)
 {
     int r = OK;
 
     bool found = false;
-    inum symlink_inum;
-    r = lookup(parent, name, found, symlink_inum);
+    r = lookup(parent, name, found, ino_out);
     if (r == OK && found) {
         r = EXIST;
         return r;
@@ -285,7 +285,10 @@ yfs_client::create_symlink(inum parent, const char *name, mode_t mode, inum &ino
     else {
         std::list<dirent> entries;
         readdir(parent, entries);
-        ec->create(extent_protocol::T_SYMLINK, ino_out);
+        ino_out = 0;
+        if ((r = ec->create(extent_protocol::T_SYMLINK, ino_out)) != extent_protocol::OK) {
+            return r;
+        }
         dirent entry;
         entry.inum = ino_out;
         entry.name = name;
@@ -299,27 +302,8 @@ yfs_client::create_symlink(inum parent, const char *name, mode_t mode, inum &ino
             content += stream.str();
         }
         ec->put(parent, content);
+        ec->put(ino_out, link);
     }
-    return r;
-}
-
-int 
-yfs_client::write_symlink(inum ino, const char *linkname) 
-{
-    int r = OK;
-
-    extent_protocol::attr a;
-    std::string content(linkname);
-    ec->getattr(ino, a);
-    if (a.type != extent_protocol::T_SYMLINK) {
-        r = NOENT;
-        return r;
-    }
-    if (a.size > 0) {
-        r = EXIST;
-        return r;
-    }
-    ec->put(ino, content);
     return r;
 }
 
