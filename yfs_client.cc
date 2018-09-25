@@ -357,8 +357,7 @@ yfs_client::readdir(inum dir, std::list<dirent> &list)
         subpos1 = subpos2 + 2;
         subpos2 = ss.size();
         std::string inum_str = ss.substr(subpos1, subpos2);
-        std::istringstream stream(inum_str);
-        stream >> entry.inum;
+        entry.inum = n2i(inum_str);
         list.push_back(entry);
 
         pos1 = pos2 + 2;
