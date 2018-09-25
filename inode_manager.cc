@@ -339,7 +339,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     if (blks_old > NDIRECT) {
       char blockid_buf[BLOCK_SIZE];
       bm->read_block(blocks[NDIRECT], blockid_buf);
-      blockid_t *indir_blks = (blockid_t *)indir_blks;
+      blockid_t *indir_blks = (blockid_t *) blockid_buf;
       for (unsigned int j = 0; j != blks_old - NDIRECT; j++) {
         bm->write_block(indir_blks[j], buf + offset);
         offset += BLOCK_SIZE;
@@ -394,14 +394,14 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     if (rest > 0 && blks_new > NDIRECT) {
       char blockid_buf[BLOCK_SIZE];
       bm->read_block(blocks[NDIRECT], blockid_buf);
-      blockid_t *indir_blks = (blockid_t *) indir_blks;
+      blockid_t *indir_blks = (blockid_t *) blockid_buf;
       for (; i != blks_new && rest > 0; i++) {
         bm->write_block(indir_blks[i - NDIRECT], buf + offset);
         offset += BLOCK_SIZE;
         rest -= BLOCK_SIZE;
       }
       for (; i < blks_old; i++) {
-        bm->free_block(blockid_buf[i - NDIRECT]);
+        bm->free_block(indir_blks[i - NDIRECT]);
       }
     }
     // file is small, no need for indirect indexing block
@@ -414,7 +414,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
       if (blks_old > NDIRECT) {
         char blockid_buf[BLOCK_SIZE];
         bm->read_block(blocks[NDIRECT], blockid_buf);
-        blockid_t *indir_blks = (blockid_t *)indir_blks;
+        blockid_t *indir_blks = (blockid_t *) blockid_buf;
         
         for (; i < blks_old; i++) {
           bm->free_block(indir_blks[i - NDIRECT]);
