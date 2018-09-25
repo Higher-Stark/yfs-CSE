@@ -178,10 +178,6 @@ yfs_client::setattr(inum ino, size_t size)
         return r;
     }
 
-    std::cout << "> SET ATTR: inode=" << ino 
-        << ", original size=" << a.size 
-        << ", new size=" << size << std::endl;
-    fflush(stdout);
     if (size > a.size) { 
         std::string padding(size - a.size, '\0');
         content += padding;
@@ -227,7 +223,6 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
             std::ostringstream stream;
             stream << it->name << "\\:" << it->inum << "\\;";
             content += stream.str();
-            std::cout << "Dir new entry <File>: " << stream.str() << std::endl;
         }
         ec->put(parent, content);
     }
@@ -265,7 +260,6 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
             std::ostringstream stream;
             stream << it->name << "\\:" << it->inum << "\\;";
             content += stream.str();
-            std::cout << "Dir new entry <dir>: " << stream.str() << std::endl;
         }
         ec->put(parent, content);
     }
@@ -329,8 +323,6 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
             found = true;
         }
     }
-    printf("lookup: %s not found\n", name);
-    fflush(stdout);
     return r;
 }
 
@@ -384,11 +376,7 @@ yfs_client::read(inum ino, size_t size, off_t off, std::string &data)
         r = NOENT;
         goto end;
     }
-    std::cout << "> READ: inode=" << ino 
-        << ", file size=" << a.size 
-        << ", offset=" << off 
-        << ", size=" << size << std::endl;
-    fflush(stdout);
+
     if (off >= a.size) {
         data = "";
         goto end;
@@ -424,11 +412,7 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
         r = IOERR;
         return r;
     }
-    std::cout << "> WRITE: inode=" << ino 
-        << ", original size=" << a.size 
-        << ", offset=" << off
-        << ", size=" << size << std::endl;
-    fflush(stdout);
+
     ec->get(ino, old_content);
     // fill the hole with zeros
     if (off > a.size) {
@@ -441,8 +425,6 @@ yfs_client::write(inum ino, size_t size, off_t off, const char *data,
     }
     // write into middle of a file
     else {
-        printf("<Write into middle of a file>\n File size: %d, offset: %ld\n", a.size, off);
-        fflush(stdout);
         std::string sub = old_content.substr(0, off);
         sub += new_content;
         if (off + size < a.size) {

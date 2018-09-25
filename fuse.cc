@@ -470,7 +470,6 @@ fuseserver_statfs(fuse_req_t req)
 
 void fuseserver_symlink(fuse_req_t req, const char *linkname, fuse_ino_t parent, const char *name) 
 {
-    printf("symlink: linkname=%s, parent=%ld, name=%s\n", linkname, parent, name);
     // char *pathname;
     int r;
     struct fuse_entry_param e;
@@ -499,8 +498,6 @@ void fuseserver_symlink(fuse_req_t req, const char *linkname, fuse_ino_t parent,
 void fuseserver_readlink(fuse_req_t req, fuse_ino_t ino) 
 {
     int r;
-    std::cout << "Readlink: " << ino << std::endl;
-    fflush(stdout);
     struct stat st;
     if ((r = getattr(ino, st)) != yfs_client::OK) {
         fuse_reply_err(req, ENOLINK);
