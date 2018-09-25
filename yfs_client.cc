@@ -227,6 +227,7 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
             std::ostringstream stream;
             stream << it->name << "\\:" << it->inum << "\\;";
             content += stream.str();
+            std::cout << "Dir new entry <File>: " << stream.str() << std::endl;
         }
         ec->put(parent, content);
     }
@@ -264,6 +265,7 @@ yfs_client::mkdir(inum parent, const char *name, mode_t mode, inum &ino_out)
             std::ostringstream stream;
             stream << it->name << "\\:" << it->inum << "\\;";
             content += stream.str();
+            std::cout << "Dir new entry <dir>: " << stream.str() << std::endl;
         }
         ec->put(parent, content);
     }
