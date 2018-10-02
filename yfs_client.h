@@ -45,6 +45,7 @@ class yfs_client {
 
   bool isfile(inum);
   bool isdir(inum);
+  bool issymlink(inum);
 
   int getfile(inum, fileinfo &);
   int getdir(inum, dirinfo &);
@@ -55,8 +56,10 @@ class yfs_client {
   int readdir(inum, std::list<dirent> &);
   int write(inum, size_t, off_t, const char *, size_t &);
   int read(inum, size_t, off_t, std::string &);
+  int readlink(inum, std::string &);
   int unlink(inum,const char *);
   int mkdir(inum , const char *, mode_t , inum &);
+  int symlink(inum, const char *, mode_t, const char *, inum &);
   
   /** you may need to add symbolic link related methods here.*/
 };
