@@ -41,13 +41,10 @@ yfs_client::isfile(inum inum)
 {
     extent_protocol::attr a;
 
-    // lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
-        // lc->release(inum);
         printf("error getting attr\n");
         return false;
     }
-    // lc->release(inum);
 
     if (a.type == extent_protocol::T_FILE) {
         printf("isfile: %lld is a file\n", inum);
@@ -76,13 +73,10 @@ bool yfs_client::issymlink(inum inum)
 {
     extent_protocol::attr a;
 
-    // lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
-        lc->release(inum);
         printf("error get attr\n");
         return false;
     } 
-    // lc->release(inum);
 
     if(a.type == extent_protocol::T_SYMLINK) {
         printf("issymlink: %lld is a symbolic link\n", inum);
@@ -98,13 +92,10 @@ yfs_client::isdir(inum inum)
     // Oops! is this still correct when you implement symlink?
     extent_protocol::attr a;
 
-    // lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
-        // lc->release(inum);
         printf("error get attr\n");
         return false;
     }
-    // lc->release(inum);
 
     if (a.type == extent_protocol::T_DIR) {
         printf("isdir: %lld is a dir\n", inum);
@@ -121,7 +112,6 @@ yfs_client::getfile(inum inum, fileinfo &fin)
 
     printf("getfile %016llx\n", inum);
     extent_protocol::attr a;
-    // lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -134,7 +124,6 @@ yfs_client::getfile(inum inum, fileinfo &fin)
     printf("getfile %016llx -> sz %llu\n", inum, fin.size);
 
 release:
-    // lc->release(inum);
     return r;
 }
 
@@ -145,7 +134,6 @@ yfs_client::getdir(inum inum, dirinfo &din)
 
     printf("getdir %016llx\n", inum);
     extent_protocol::attr a;
-    // lc->acquire(inum);
     if (ec->getattr(inum, a) != extent_protocol::OK) {
         r = IOERR;
         goto release;
@@ -155,7 +143,6 @@ yfs_client::getdir(inum inum, dirinfo &din)
     din.ctime = a.ctime;
 
 release:
-    // lc->release(inum);
     return r;
 }
 
@@ -180,13 +167,11 @@ yfs_client::setattr(inum ino, size_t size)
      * according to the size (<, =, or >) content length.
      */
     std::string content;
-    // lc->acquire(ino);
     ec->get(ino, content);
     extent_protocol::attr a;
     ec->getattr(ino, a);
     if (a.type == 0) {
         r = IOERR;
-        // lc->release(ino);
         return r;
     }
 
@@ -199,7 +184,6 @@ yfs_client::setattr(inum ino, size_t size)
         a.size = size;
     }
     ec->put(ino, content);
-    // lc->release(ino);
 
     return r;
 }
@@ -223,7 +207,29 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
     }
     else {
         std::list<dirent> entries;
-        readdir(parent, entries);
+
+        // read parent directory entries
+        std::string buf;
+        ec->get(parent, buf);
+        std::string::size_type pos1 = 0;
+        std::string::size_type pos2 = buf.find("\\;", pos1);
+        while (pos2 != buf.npos && pos1 != pos2)
+        {
+            std::string ss = buf.substr(pos1, pos2);
+            std::string::size_type subpos1 = 0;
+            std::string::size_type subpos2 = ss.find("\\:");
+            struct dirent entry;
+            entry.name = ss.substr(subpos1, subpos2);
+            subpos1 = subpos2 + 2;
+            subpos2 = ss.size();
+            std::string inum_str = ss.substr(subpos1, subpos2);
+            entry.inum = n2i(inum_str);
+            entries.push_back(entry);
+
+            pos1 = pos2 + 2;
+            pos2 = buf.find("\\;", pos1);
+        }
+
         ec->create(extent_protocol::T_FILE, ino_out);
         dirent entry;
         entry.inum = ino_out;
@@ -295,7 +301,29 @@ yfs_client::symlink(inum parent, const char *link, mode_t mode, const char *name
     }
     else {
         std::list<dirent> entries;
-        readdir(parent, entries);
+
+        // read parent directory entries
+        std::string buf;
+        ec->get(parent, buf);
+        std::string::size_type pos1 = 0;
+        std::string::size_type pos2 = buf.find("\\;", pos1);
+        while (pos2 != buf.npos && pos1 != pos2)
+        {
+            std::string ss = buf.substr(pos1, pos2);
+            std::string::size_type subpos1 = 0;
+            std::string::size_type subpos2 = ss.find("\\:");
+            struct dirent entry;
+            entry.name = ss.substr(subpos1, subpos2);
+            subpos1 = subpos2 + 2;
+            subpos2 = ss.size();
+            std::string inum_str = ss.substr(subpos1, subpos2);
+            entry.inum = n2i(inum_str);
+            entries.push_back(entry);
+
+            pos1 = pos2 + 2;
+            pos2 = buf.find("\\;", pos1);
+        }
+
         ino_out = 0;
         if ((r = ec->create(extent_protocol::T_SYMLINK, ino_out)) != extent_protocol::OK) {
             return r;
@@ -331,9 +359,7 @@ yfs_client::lookup(inum parent, const char *name, bool &found, inum &ino_out)
      */
     found = false;
     std::list<dirent> entries = std::list<dirent>();
-    // lc->acquire(parent);
     readdir(parent, entries);
-    // lc->release(parent);
     for (std::list<dirent>::iterator it = entries.begin(); 
         it != entries.end(); it++) {
         if (it->name.compare(name) == 0) {

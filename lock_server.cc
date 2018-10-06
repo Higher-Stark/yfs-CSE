@@ -27,10 +27,12 @@ lock_server::acquire(int clt, lock_protocol::lockid_t lid, int &r)
 {
   lock_protocol::status ret = lock_protocol::OK;
 	// Your lab2 part2 code goes here
-  printf("acquire request from clt %d\n", clt);
+  // printf("acquire request from clt %d\n", clt);
   pthread_mutex_lock(&mutex);
-  while (locks.find(lid) != locks.end() && locks[lid]) {
-    pthread_cond_wait(&cond, &mutex);
+  if (locks.find(lid) != locks.end()) {
+    while (locks[lid]) {
+      pthread_cond_wait(&cond, &mutex);
+    }
   }
   locks[lid] = true;
   pthread_mutex_unlock(&mutex);
@@ -42,10 +44,15 @@ lock_server::release(int clt, lock_protocol::lockid_t lid, int &r)
 {
   lock_protocol::status ret = lock_protocol::OK;
 	// Your lab2 part2 code goes here
-  printf("release request from clt %d\n", clt);
+  // printf("release request from clt %d\n", clt);
   pthread_mutex_lock(&mutex);
-  locks[lid] = false;
-  pthread_cond_signal(&cond);
+  if (locks.find(lid) == locks.end()) {
+    ret = lock_protocol::NOENT;
+  }
+  else {
+    locks[lid] = false;
+    pthread_cond_signal(&cond);
+  }
   pthread_mutex_unlock(&mutex);
   return ret;
 }
