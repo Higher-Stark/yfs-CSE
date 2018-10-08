@@ -1,6 +1,6 @@
 # Debug tips
 
-_just for part2_
+_just for lab1 part2_
 
 ## Prepare
 
