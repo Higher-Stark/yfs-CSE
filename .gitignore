@@ -39,3 +39,12 @@ tmprand
 .vscode
 
 tmp.sh
+extent_server
+lab2*.tgz
+lock_demo
+lock_server
+lock_tester
+test-lab2-part1-g
+test-lab2-part2-a
+test-lab2-part2-b
+yfs_client

@@ -235,13 +235,13 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
     }
     else {
         if ((r = ec->create(extent_protocol::T_FILE, ino_out)) != extent_protocol::OK){
-            printf("create file error\n");
-            fflush(stdout);
+            // printf("create file error\n");
+            // fflush(stdout);
             goto release;
         } 
         lc->acquire(ino_out);
-        printf("create file: inode [ %lld ]\n", ino_out);
-        fflush(stdout);
+        // printf("create file: inode [ %lld ]\n", ino_out);
+        // fflush(stdout);
         dirent entry;
         entry.inum = ino_out;
         entry.name = name;
@@ -260,8 +260,8 @@ yfs_client::create(inum parent, const char *name, mode_t mode, inum &ino_out)
 
 release:
     lc->release(parent);
-    printf("create file done\n");
-    fflush(stdout);
+    // printf("create file done\n");
+    // fflush(stdout);
     return r;
 }
 
@@ -323,8 +323,8 @@ yfs_client::symlink(inum parent, const char *link, mode_t mode, const char *name
         if ((r = ec->create(extent_protocol::T_SYMLINK, ino_out)) != extent_protocol::OK) {
             goto release;
         }
-        printf("symlink: parent inode: %lld,\tcreate symbolic link - inode [ %lld ]\n", parent, ino_out);
-        fflush(stdout);
+        // printf("symlink: parent inode: %lld,\tcreate symbolic link - inode [ %lld ]\n", parent, ino_out);
+        // fflush(stdout);
         lc->acquire(ino_out);
         dirent entry;
         entry.inum = ino_out;
@@ -345,8 +345,8 @@ yfs_client::symlink(inum parent, const char *link, mode_t mode, const char *name
 
 release:
     lc->release(parent);
-    printf("symlink: create symbolic link done\n");
-    fflush(stdout);
+    // printf("symlink: create symbolic link done\n");
+    // fflush(stdout);
     return r;
 }
 
