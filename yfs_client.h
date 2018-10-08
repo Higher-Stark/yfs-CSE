@@ -40,6 +40,9 @@ class yfs_client {
   static std::string filename(inum);
   static inum n2i(std::string);
 
+  int readdir_nolock(inum, std::list<dirent> &);
+  static bool find_entry(std::list<dirent> &, std::string);
+
  public:
   yfs_client(std::string, std::string);
 
