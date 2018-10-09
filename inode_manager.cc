@@ -348,9 +348,14 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     while (rest > 0 && i < MAXFILE) {
       // allocate new block to store file content
       uint32_t bid = bm->alloc_block();
-      bm->write_block(bid, buf + offset);
-      offset += BLOCK_SIZE;
-      rest -= BLOCK_SIZE;
+      // alloc a new block in memory to store buf temporary
+      char *blk_tmp = (char *)malloc(BLOCK_SIZE);
+      int write_count = MIN(rest, BLOCK_SIZE); 
+      memcpy(blk_tmp, buf + offset, write_count);
+      bm->write_block(bid, blk_tmp);
+      offset += write_count;
+      rest -= write_count;
+      free(blk_tmp);
 
       // put block id into inode
       if (i < NDIRECT) {
@@ -381,10 +386,14 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
     int rest = size;
     unsigned int maxIdx = MIN(blks_new, NDIRECT);
     unsigned int i = 0;
+    char *blk_tmp = (char *)malloc(BLOCK_SIZE);
     for (; i != maxIdx && rest > 0; i++) {
-      bm->write_block(blocks[i], buf + offset);
-      offset += BLOCK_SIZE;
-      rest -= BLOCK_SIZE;
+      memset(blk_tmp, 0, BLOCK_SIZE);
+      int write_count = MIN(rest, BLOCK_SIZE);
+      memcpy(blk_tmp, buf + offset, write_count);
+      bm->write_block(blocks[i], blk_tmp);
+      offset += write_count;
+      rest -= write_count;
     }
     // file is large, using indirect indexing block
     if (rest > 0 && blks_new > NDIRECT) {
@@ -392,9 +401,12 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
       bm->read_block(blocks[NDIRECT], blockid_buf);
       blockid_t *indir_blks = (blockid_t *) blockid_buf;
       for (; i != blks_new && rest > 0; i++) {
-        bm->write_block(indir_blks[i - NDIRECT], buf + offset);
-        offset += BLOCK_SIZE;
-        rest -= BLOCK_SIZE;
+        memset(blk_tmp, 0, BLOCK_SIZE);
+        int write_count = MIN(rest, BLOCK_SIZE);
+        memcpy(blk_tmp, buf + offset, write_count);
+        bm->write_block(indir_blks[i - NDIRECT], blk_tmp);
+        offset += write_count;
+        rest -= write_count;
       }
       for (; i < blks_old; i++) {
         bm->free_block(indir_blks[i - NDIRECT]);
@@ -419,6 +431,7 @@ inode_manager::write_file(uint32_t inum, const char *buf, int size)
         blocks[i] = 0;
       }
     }
+    free(blk_tmp);
   }
   ino->size = size;
   t = std::time(NULL);
