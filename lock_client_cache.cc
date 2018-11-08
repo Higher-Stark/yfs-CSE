@@ -27,12 +27,27 @@ lock_client_cache::lock_client_cache(std::string xdst,
   rpcs *rlsrpc = new rpcs(rlock_port);
   rlsrpc->reg(rlock_protocol::revoke, this, &lock_client_cache::revoke_handler);
   rlsrpc->reg(rlock_protocol::retry, this, &lock_client_cache::retry_handler);
+
+  pthread_mutex_init(&pooll, NULL);
+  pthread_cond_init(&poolc, NULL);
 }
 
 lock_protocol::status
 lock_client_cache::acquire(lock_protocol::lockid_t lid)
 {
   int ret = lock_protocol::OK;
+  pthread_mutex_lock(&pooll);
+  if (lockid_state.find(lid) == lockid_state.end()) {
+    lockid_state.insert(std::pair<lock_protocol::lockid_t, lstates>(lid, none));
+  }
+  switch(lockid_state[lid]) {
+    case none: {
+      pthread_mutex_unlock(&pooll);
+      int r;
+      ret = cl->call(lock_protocol::acquire, cl->id, lid, r);
+      // TODOs
+    }
+  }
   return ret;
 }
 

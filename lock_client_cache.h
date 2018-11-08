@@ -26,6 +26,15 @@ class lock_client_cache : public lock_client {
   int rlock_port;
   std::string hostname;
   std::string id;
+  // states for locks in lock pool
+  enum lstates {none, own, free, acquiring, releasing};
+  std::map<lock_protocol::lockid_t, lstates> lockid_state;
+  std::map<lock_protocol::lockid_t, pthread_cond_t> lockid_cond;
+  // pool lock for cached lock client
+  pthread_mutex_t pooll;
+  // pool condition variable for cache lock client
+  pthread_cond_t poolc;
+
  public:
   static int last_port;
   lock_client_cache(std::string xdst, class lock_release_user *l = 0);
