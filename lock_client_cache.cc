@@ -37,13 +37,13 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
 {
   int ret = lock_protocol::OK;
   pthread_mutex_lock(&pooll);
-  tprintf("%s <client acquire> %lld\n",id.c_str(), lid);
+  tprintf("%s<<%ld>> <client acquire> %lld\n",id.c_str(), pthread_self(), lid);
   // init alock in lock table if not exists
   if (ltable.find(lid) == ltable.end()) {
     alock al;
     al.l_state = NONE;
     al.revoke = false;
-    al.waitings = std::set<pid_t>();
+    al.waitings = std::set<pthread_t>();
     pthread_cond_init(&al.l_cond, NULL);
     ltable.insert(std::pair<lock_protocol::lockid_t, alock>(lid, al));
   }
@@ -51,6 +51,7 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
     switch(ltable[lid].l_state) {
       case NONE: {
         // change state to acquiring
+        tprintf("%s<<%ld>> attempty to acquire lock %lld\n", id.c_str(), pthread_self(), lid);
         ltable[lid].l_state = ACQUIRING;
         pthread_mutex_unlock(&pooll);
         int r;
@@ -70,7 +71,7 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
           goto finish;
         }
         else if (ret == lock_protocol::RETRY) {
-          tprintf("%s: lock %lld acquiring failed\n", id.c_str(), lid);
+          tprintf("%s<<%ld>>: lock %lld acquiring failed\n", id.c_str(), pthread_self(), lid);
         }
         else {
           tprintf("%s: unexpected return value %d", id.c_str(), ret);
@@ -90,12 +91,12 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
     }
   }
 finish:
-  pid_t myself = pthread_self();
+  pthread_t myself = pthread_self();
   if (ltable[lid].waitings.find(myself) != ltable[lid].waitings.end())
   {
     ltable[lid].waitings.erase(myself);
   }
-  tprintf("%s: lock %lld grabbed\n", id.c_str(), lid);
+  tprintf("%s<<%ld>>: lock %lld grabbed\n", id.c_str(), myself, lid);
   ret = lock_protocol::OK;
   pthread_mutex_unlock(&pooll);
   return ret;
@@ -106,7 +107,7 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
 {
   int ret = lock_protocol::OK;
   pthread_mutex_lock(&pooll);
-  tprintf("%s <client release> %lld\n",id.c_str(), lid);
+  tprintf("%s<<%ld>> <client release> %lld\n",id.c_str(), pthread_self(), lid);
   if (ltable.find(lid) == ltable.end()) {
     tprintf("Warning [1]: an unexisting lock %lld released\n", lid);
     pthread_mutex_unlock(&pooll);
@@ -118,8 +119,9 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     }
     else {
       ltable[lid].l_state = FREE;
-      tprintf("%lld freed\n", lid);
+      tprintf("%s<<%ld>> freed lock %lld\n",id.c_str(), pthread_self(), lid);
       pthread_cond_signal(&ltable[lid].l_cond);
+      goto finish;
     }
   }
   if (ltable[lid].l_state == RELEASING) {
@@ -137,9 +139,10 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     }
   }
   else {
-    tprintf("Warning [2]: lock %lld is released in abnormal state %d\n", lid, (int)ltable[lid].l_state);
+    tprintf("Warning [2]:%s lock %lld is released in abnormal state %d\n",id.c_str(), lid, ltable[lid].l_state);
     ret = lock_protocol::IOERR;
   }
+finish:
   pthread_mutex_unlock(&pooll);
   return ret;
 }
@@ -150,7 +153,7 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
 {
   int ret = rlock_protocol::OK;
   pthread_mutex_lock(&pooll);
-  tprintf("%s <client revoke> %lld\n",id.c_str(), lid);
+  tprintf("%s<<%ld>> <client revoke> %lld\n",id.c_str(), pthread_self(), lid);
   if (ltable[lid].l_state == FREE) {
     int r;
     ltable[lid].l_state = RELEASING;
@@ -174,8 +177,9 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
     ltable[lid].revoke = true;
     tprintf("revoke lock %lld pending\n", lid);
   }
+  else if (ltable[lid].l_state == RELEASING) {}
   else {
-    tprintf ("Warning [3]: revoke received, but lock %lld in abnormal state %d", lid, (int)ltable[lid].l_state);
+    tprintf ("Warning [3]:%s revoke received, but lock %lld in abnormal state %d\n",id.c_str(), lid, ltable[lid].l_state);
     ret = lock_protocol::IOERR;
   }
   pthread_mutex_unlock(&pooll);
@@ -188,7 +192,7 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid,
 {
   int ret = rlock_protocol::OK;
   pthread_mutex_lock(&pooll);
-  tprintf("%s <client retry> %lld\n",id.c_str(), lid);
+  tprintf("%s<<%ld>> <client retry> %lld\n",id.c_str(), pthread_self(), lid);
   if (ltable.find(lid) == ltable.end()) {
     tprintf("Error: client %s hasn't acquired for lock %lld\n", id.c_str(), lid);
     pthread_mutex_unlock(&pooll);
@@ -199,7 +203,7 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid,
     pthread_cond_signal(&ltable[lid].l_cond);
   } 
   else {
-    tprintf("Warning [4]: lock %lld in state %d\n", lid, (int)ltable[lid].l_state);
+    tprintf("Warning [4]:%s<<%ld>> lock %lld in state %d\n",id.c_str(), pthread_self(), lid, ltable[lid].l_state);
   }
   pthread_mutex_unlock(&pooll);
   return ret;

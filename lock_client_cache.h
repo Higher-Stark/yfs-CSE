@@ -34,7 +34,7 @@ class lock_client_cache : public lock_client {
     int l_state;
     pthread_cond_t l_cond;
     bool revoke;
-    std::set<pid_t> waitings;
+    std::set<pthread_t> waitings;
     // pthread_cond_t l_revoke;
   } alock;
   std::map<lock_protocol::lockid_t, alock> ltable;
