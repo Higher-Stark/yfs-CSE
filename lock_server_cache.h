@@ -19,6 +19,12 @@ class lock_server_cache {
   pthread_mutex_t lock;
   pthread_cond_t cond;
 
+  /*
+   * revoke: have server sent revoke request to client?
+   * free: whether the lock is held by some client
+   * holder: client that hold the lock
+   * waitings: clients who are waiting for the lock
+   */
   typedef struct lockitem_ {
     bool revoke;
     bool free;

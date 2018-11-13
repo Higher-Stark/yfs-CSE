@@ -51,7 +51,7 @@ class lock_client_cache : public lock_client {
   rlock_protocol::status revoke_handler(lock_protocol::lockid_t, 
                                         int &);
   rlock_protocol::status retry_handler(lock_protocol::lockid_t, 
-                                       int &);
+                                       bool shouldreturn, int &);
 };
 
 

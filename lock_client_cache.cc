@@ -59,15 +59,7 @@ lock_client_cache::acquire(lock_protocol::lockid_t lid)
         pthread_mutex_lock(&pooll);
         // OK -> lock acquired
         if (ret == lock_protocol::OK) {
-          // tprintf("OK!\t");
-          if (!ltable[lid].revoke) {
-            ltable[lid].l_state = OWN;
-          }
-          // if received revoke already, pend revoke
-          else {
-            ltable[lid].l_state = RELEASING;
-          }
-          // printf("[1]%d\n", ltable[lid].l_state);
+          ltable[lid].l_state = OWN;
           goto finish;
         }
         else if (ret == lock_protocol::RETRY) {
@@ -114,7 +106,7 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     return ret;
   }
   if (ltable[lid].l_state == OWN) {
-    if (ltable[lid].waitings.empty()) {
+    if (ltable[lid].waitings.empty() && ltable[lid].revoke) {
       ltable[lid].l_state = RELEASING;
     }
     else {
@@ -132,6 +124,7 @@ lock_client_cache::release(lock_protocol::lockid_t lid)
     if (ret == lock_protocol::OK) {
       tprintf("%s lock %lld has been returned to server successfully\n", id.c_str(), lid);
       ltable[lid].l_state = NONE;
+      ltable[lid].revoke = false;
       pthread_cond_signal(&ltable[lid].l_cond);   // here we awake someone
     }
     else {
@@ -163,6 +156,7 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
     if (ret == lock_protocol::OK) {
       tprintf("%s lock %lld has been returned to server successfully\n", id.c_str(), lid);
       ltable[lid].l_state = NONE;
+      ltable[lid].revoke = false;
       pthread_cond_signal(&ltable[lid].l_cond);   // here we awake someone
     }
     else {
@@ -170,7 +164,8 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
     }
   }
   else if (ltable[lid].l_state == OWN) {
-    ltable[lid].l_state = RELEASING;
+    // ltable[lid].l_state = RELEASING;
+    ltable[lid].revoke = true;
     tprintf("revoke lock %lld pending\n", lid);
   }
   else if (ltable[lid].l_state == ACQUIRING) {
@@ -188,7 +183,7 @@ lock_client_cache::revoke_handler(lock_protocol::lockid_t lid,
 
 rlock_protocol::status
 lock_client_cache::retry_handler(lock_protocol::lockid_t lid, 
-                                 int &)
+                                 bool shouldreturn, int &)
 {
   int ret = rlock_protocol::OK;
   pthread_mutex_lock(&pooll);
@@ -200,9 +195,11 @@ lock_client_cache::retry_handler(lock_protocol::lockid_t lid,
   }
   if (ltable[lid].l_state == ACQUIRING) {
     ltable[lid].l_state = NONE;
+    if (shouldreturn) ltable[lid].revoke = true;
     pthread_cond_signal(&ltable[lid].l_cond);
   } 
   else {
+    // if (shouldreturn) ltable[lid].revoke = true;
     tprintf("Warning [4]:%s<<%ld>> lock %lld in state %d\n",id.c_str(), pthread_self(), lid, ltable[lid].l_state);
   }
   pthread_mutex_unlock(&pooll);

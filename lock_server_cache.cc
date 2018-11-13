@@ -70,6 +70,14 @@ int lock_server_cache::acquire(lock_protocol::lockid_t lid, std::string id,
   return ret;
 }
 
+/*
+ * lock_server_cache::release
+ * once a client release the lock,
+ * mark the lock free and revoke false.
+ * if some client is waiting, send retry.
+ * if more than one client is waiting,
+ * ask the retrying client to return when release
+ */
 int 
 lock_server_cache::release(lock_protocol::lockid_t lid, std::string id, 
          int &r)
@@ -90,8 +98,9 @@ lock_server_cache::release(lock_protocol::lockid_t lid, std::string id,
     handle successor(succ);
     rpcc *cl = successor.safebind();
     int r;
+    bool shouldreturn = ltable[lid].waitings.size() > 1;
     pthread_mutex_unlock(&lock);
-    ret = cl->call(rlock_protocol::retry, lid, r);
+    ret = cl->call(rlock_protocol::retry, lid, shouldreturn, r);
     pthread_mutex_lock(&lock);
     if (ret == lock_protocol::OK) {
       tprintf("retry %s successfully\n", succ.c_str());
