@@ -5,6 +5,7 @@
 #define lock_client_cache_h
 
 #include <string>
+#include <set>
 #include "lock_protocol.h"
 #include "rpc.h"
 #include "lock_client.h"
@@ -26,6 +27,21 @@ class lock_client_cache : public lock_client {
   int rlock_port;
   std::string hostname;
   std::string id;
+
+  // states for locks in lock pool
+  enum lstates {NONE, OWN, FREE, ACQUIRING, RELEASING};
+  typedef struct ty_alock {
+    int l_state;
+    pthread_cond_t l_cond;
+    bool revoke;
+    std::set<pthread_t> waitings;
+    // pthread_cond_t l_revoke;
+  } alock;
+  std::map<lock_protocol::lockid_t, alock> ltable;
+  pthread_mutex_t pooll;
+  // pool condition variable for cache lock client
+  pthread_cond_t poolc;
+
  public:
   static int last_port;
   lock_client_cache(std::string xdst, class lock_release_user *l = 0);
@@ -35,7 +51,7 @@ class lock_client_cache : public lock_client {
   rlock_protocol::status revoke_handler(lock_protocol::lockid_t, 
                                         int &);
   rlock_protocol::status retry_handler(lock_protocol::lockid_t, 
-                                       int &);
+                                       bool shouldreturn, int &);
 };
 
 
