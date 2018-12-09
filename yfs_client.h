@@ -40,7 +40,6 @@ class yfs_client {
   static std::string filename(inum);
   static inum n2i(std::string);
 
-  int readdir_nolock(inum, std::list<dirent> &);
   static bool find_entry(std::list<dirent> &, std::string);
 
  public:
@@ -65,6 +64,7 @@ class yfs_client {
   int symlink(inum, const char *, mode_t, const char *, inum &);
   
   // directory entry parse
+  int readdir_nolock(inum, std::list<dirent> &);
   static int deDir(std::string buf, std::list<dirent> &);
   static int enDir(const std::list<dirent> &, std::string &);
   static int rmdirentry(std::list<dirent> &, std::string, inum &);

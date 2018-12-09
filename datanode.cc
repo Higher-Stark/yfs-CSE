@@ -7,6 +7,10 @@
 
 using namespace std;
 
+#ifndef _DEBUG_
+#define _DEBUG_ 1
+#endif
+
 int DataNode::init(const string &extent_dst, const string &namenode, const struct sockaddr_in *bindaddr) {
   ec = new extent_client(extent_dst);
 
@@ -37,6 +41,14 @@ int DataNode::init(const string &extent_dst, const string &namenode, const struc
 
   /* Add your initialization here */
 
+  if (ec->put(1, "") != extent_protocol::OK) {
+    fprintf(stdout, "[ Error ]: 1000: init root failed\n");
+    fflush(stdout);
+    return -1;
+  }
+  #if _DEBUG_
+  fprintf(stdout, "[ Info ] root initialized\n");
+  #endif
   return 0;
 }
 
@@ -51,17 +63,27 @@ int DataNode::init(const string &extent_dst, const string &namenode, const struc
 bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &buf) {
   /* Your lab4 part 2 code */
   // TODO:
+  #if _DEBUG_
+  fprintf(stdout, "Read block %d\n", bid);
+  fflush(stdout);
+  #endif
+
   string tmpbuf;
   int ret = ec->read_block(bid, tmpbuf);
   if (ret != extent_protocol::OK) {
+    #if _DEBUG_
     fprintf(stdout, "[ Error ] 1002: read block %d error\n", bid);
+    fflush(stdout);
+    #endif
     return false;
   }
 
   if (offset + len > tmpbuf.size()) {
     fprintf(stdout, "[ Warning ] 1001: out of string boundary\n");
   }
-  buf = std::string(tmpbuf, offset, MIN(offset+len, tmpbuf.size()));
+  buf = tmpbuf.substr(offset, len);
+  fprintf(stdout, "[ Info ] read from block %d [%ld:%ld]: %s\n", bid, offset, len, buf.c_str());
+  fflush(stdout);
   return true;
 }
 
@@ -73,16 +95,35 @@ bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &b
 bool DataNode::WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const string &buf) {
   /* Your lab4 part 2 code */
   // TODO:
+  #if _DEBUG_
+  fprintf(stdout, "Write block %d, offset: %ld, len: %ld, buf: %s, buf size: %ld\n", bid, offset, len, buf.c_str(), buf.size());
+  fflush(stdout);
+  #endif
+
   string oldbuf;
   int ret = ec->read_block(bid, oldbuf);
   if (ret != extent_protocol::OK) {
+    #if _DEBUG_
     fprintf(stdout, "[ Error ] 1003: read block %d error\n", bid);
+    fflush(stdout);
+    #endif
     return false;
   }
-  string newbuf = string(oldbuf, 0, offset) + string(buf, 0, len) + string(oldbuf, offset + len ,oldbuf.size());
+  #if _DEBUG_
+  fprintf(stdout, "[ Info ] old content of block %d: %s\n", bid, oldbuf.c_str());
+  fflush(stdout);
+  #endif
+  string newbuf = oldbuf.substr(0, offset) + buf + oldbuf.substr(offset + len);
+  #if _DEBUG_
+  fprintf(stdout, "[ Info ] new content of block %d: %s\n", bid, newbuf.c_str());
+  fflush(stdout);
+  #endif
   ret = ec->write_block(bid, newbuf);
   if (ret != extent_protocol::OK) {
+    #if _DEBUG_
     fprintf(stdout, "[ Error ] 1004: write block %d error\n", bid);
+    fflush(stdout);
+    #endif
     return false;
   }
   return true;

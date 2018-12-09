@@ -17,6 +17,7 @@ yfs_client::yfs_client(std::string extent_dst, std::string lock_dst)
   lc = new lock_client_cache(lock_dst);
   if (ec->put(1, "") != extent_protocol::OK)
     printf("error init root dir\n"); // XYB: init root dir
+  fflush(stdout);
 }
 
 
@@ -550,7 +551,11 @@ int yfs_client::unlink(inum parent,const char *name)
 
 int yfs_client::deDir(std::string buf, std::list<dirent> & list)
 {
+    list.clear();
     int r = OK;
+
+    fprintf(stdout, "[ Info ] deDir: buf: %s\n", buf.c_str());
+    fflush(stdout);
 
     std::string::size_type pos1 = 0;
     std::string::size_type pos2 = buf.find("\\;", pos1);
@@ -579,6 +584,10 @@ int yfs_client::enDir(const std::list<dirent> &list, std::string &buf)
         stream << it->name << "\\:" << it->inum << "\\;";
     }
     buf = stream.str();
+    
+    std::cout << "[ Info ] enDir: buf:" << buf << std::endl;
+    std::cout.flush();
+
     return OK;
 }
 
@@ -596,19 +605,21 @@ int yfs_client::rmdirentry(std::list<dirent> &list, std::string name, inum &ino_
         list.erase(it);
         r = OK;
     }
+    std::cout << "[ Info ] rm dir entry: name: " << name << "; inum: " << ino_out << std::endl;
+    std::cout.flush();
     return r;
 }
 
 int yfs_client::adddirentry(std::list<dirent> &list, const std::string name, const inum ino)
 {
+    std::cout << "[ Info ] add dir entry: name: " << name << "; inum: " << ino << std::endl;
+    std::cout.flush();
+
     struct dirent en;
     en.name = name;
     en.inum = ino;
     for (std::list<dirent>::iterator it= list.begin(); it != list.end(); it++) {
         if (it->name.compare(name) == 0) {
-            lc->acquire(it->inum);
-            ec->remove(it->inum);
-            lc->release(it->inum);
             it->inum = ino;
             return OK;
         }
