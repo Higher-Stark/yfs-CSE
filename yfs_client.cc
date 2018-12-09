@@ -548,3 +548,71 @@ int yfs_client::unlink(inum parent,const char *name)
     return r;
 }
 
+int yfs_client::deDir(std::string buf, std::list<dirent> & list)
+{
+    int r = OK;
+
+    std::string::size_type pos1 = 0;
+    std::string::size_type pos2 = buf.find("\\;", pos1);
+    while (pos2 != buf.npos && pos1 != pos2) {
+        std::string ss = buf.substr(pos1, pos2);
+        std::string::size_type subpos1 = 0;
+        std::string::size_type subpos2 = ss.find("\\:");
+        struct dirent entry;
+        entry.name = ss.substr(subpos1, subpos2);
+        subpos1 = subpos2 + 2;
+        subpos2 = ss.size();
+        std::string inum_str = ss.substr(subpos1, subpos2);
+        entry.inum = n2i(inum_str);
+        list.push_back(entry);
+
+        pos1 = pos2 + 2;
+        pos2 = buf.find("\\;", pos1);
+    }
+    return r;
+}
+
+int yfs_client::enDir(const std::list<dirent> &list, std::string &buf)
+{
+    std::ostringstream stream;
+    for (std::list<dirent>::const_iterator it = list.cbegin(); it != list.cend(); it++) {
+        stream << it->name << "\\:" << it->inum << "\\;";
+    }
+    buf = stream.str();
+    return OK;
+}
+
+int yfs_client::rmdirentry(std::list<dirent> &list, std::string name, inum &ino_out)
+{
+    int r = NOENT;
+    std::list<dirent>::iterator it = list.begin();
+    while (it != list.end()) {
+        if (it->name.compare(name) == 0) break;
+        it++;
+    }
+    ino_out = 0;
+    if (it != list.end()) {
+        ino_out = it->inum;
+        list.erase(it);
+        r = OK;
+    }
+    return r;
+}
+
+int yfs_client::adddirentry(std::list<dirent> &list, const std::string name, const inum ino)
+{
+    struct dirent en;
+    en.name = name;
+    en.inum = ino;
+    for (std::list<dirent>::iterator it= list.begin(); it != list.end(); it++) {
+        if (it->name.compare(name) == 0) {
+            lc->acquire(it->inum);
+            ec->remove(it->inum);
+            lc->release(it->inum);
+            it->inum = ino;
+            return OK;
+        }
+    }
+    list.push_back(en);
+    return OK;
+}

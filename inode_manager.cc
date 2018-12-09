@@ -477,47 +477,144 @@ inode_manager::remove_file(uint32_t inum)
   return;
 }
 
+/*
+ * function: append_block
+ * description: allocate and append a block to the inode and return its id
+ * @inum: inode number
+ * @bid: latest allocated block
+ */
 void
 inode_manager::append_block(uint32_t inum, blockid_t &bid)
 {
-  /*
-   * your code goes here.
-   */
+  // TODO:
+  struct inode* ino = get_inode(inum);
+  if (!ino) {
+    bid = -1;
+    fprintf(stderr, "[ Error ] 0001: inode %d not exist\n", inum);
+    return;
+  }
 
+  bid = bm->alloc_block();
+  blockid_t last_blk = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE ;
+  // file size is not expected to excceed the max size
+  assert(last_blk < MAXFILE);
+
+  bool update_inode = false;
+  if (last_blk < NDIRECT - 1) {
+    ino->blocks[last_blk] = bid;
+    update_inode = true;
+  }
+  else if (last_blk == NDIRECT - 1) {
+    blockid_t indir_blk = bm->alloc_block();
+    ino->blocks[NDIRECT - 1] = indir_blk;
+    update_inode = true;
+    char indir_blk_buf[BLOCK_SIZE];
+    memset(indir_blk_buf, 0, BLOCK_SIZE);
+    blockid_t *indir_blk_list = (blockid_t *)indir_blk_buf;
+    indir_blk_list[0] = bid;
+    // write indirect index block
+    bm->write_block(indir_blk, indir_blk_buf);
+  }
+  else {
+    char indir_blk_buf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT - 1], indir_blk_buf);
+    blockid_t *indir_blk_list = (blockid_t *)indir_blk_buf;
+    indir_blk_list[last_blk - NDIRECT] = bid;
+    // update indirect index block
+    bm->write_block(ino->blocks[NDIRECT - 1], indir_blk_buf);
+  }
+  // update inode if necessary
+  // leaving mtime update to function complete
+  if (update_inode) put_inode(inum, ino);
+  free(ino);
+  return;
 }
 
+/* 
+ * function: get_block_ids
+ * description: return id of all data blocks of the file
+ * @inum: inode number
+ * @block_ids: all data blocks' id read from inode inum
+ */
 void
 inode_manager::get_block_ids(uint32_t inum, std::list<blockid_t> &block_ids)
 {
-  /*
-   * your code goes here.
-   */
+  // TODO:
+  struct inode *ino = get_inode(inum);
+  if (!ino) {
+    fprintf(stderr, "[ Error ] 0002: inode %d not exist\n", inum);
+    block_ids = std::list<blockid_t>();
+    return;
+  }
 
+  blockid_t num_blks = (ino->size + BLOCK_SIZE - 1) / BLOCK_SIZE;
+  if (num_blks == 0) {
+    block_ids = std::list<blockid_t>();
+    free(ino);
+    return;
+  }
+  if (num_blks < NDIRECT - 1) {
+    block_ids = std::list<blockid_t>(ino->blocks, ino->blocks + num_blks);
+  }
+  else {
+    char indir_blk_buf[BLOCK_SIZE];
+    bm->read_block(ino->blocks[NDIRECT - 1], indir_blk_buf);
+    blockid_t blk_list[MAXFILE];
+    memcpy(blk_list, ino->blocks, (NDIRECT - 1) * sizeof(blockid_t));
+    memcpy(blk_list + NDIRECT - 1, indir_blk_buf, (num_blks - NDIRECT + 1) * sizeof(blockid_t));
+    block_ids = std::list<blockid_t>(blk_list, blk_list + num_blks);
+  }
+  free(ino);
+  return;
 }
 
+/*
+ * function: read_block
+ * description: return the data of the disk block
+ * @id: block id
+ * @buf: block id's content to be placed
+ */
 void
 inode_manager::read_block(blockid_t id, char buf[BLOCK_SIZE])
 {
-  /*
-   * your code goes here.
-   */
-
+  // TODO:
+  bm->read_block(id, buf);
 }
 
+/* 
+ * function: write_block
+ * description: write the data to the disk block
+ * @id: block id
+ * @buf: content to write
+ */
 void
 inode_manager::write_block(blockid_t id, const char buf[BLOCK_SIZE])
 {
-  /*
-   * your code goes here.
-   */
-
+  // TODO:
+  bm->write_block(id, buf);
 }
 
+/* 
+ * function: complete
+ * decription: Given an inode number and size, this request indicates 
+ * that the writes to the file is finished, so the metedata (file size, 
+ * modification time) in inode could be updated safely.
+ * @inum: inode number
+ * @size: inode latest size
+ */
 void
 inode_manager::complete(uint32_t inum, uint32_t size)
 {
-  /*
-   * your code goes here.
-   */
+  // TODO:
+  struct inode* ino = get_inode(inum);
+  if (!ino) {
+    fprintf(stderr, "[ Error ] 0003: inode %d not exists\n", inum);
+    return;
+  }
 
+  ino->size = size;
+  ino->mtime = std::time(NULL);
+  put_inode(inum, ino);
+  free(ino);
+  return;
 }

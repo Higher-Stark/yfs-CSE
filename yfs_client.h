@@ -64,7 +64,11 @@ class yfs_client {
   int mkdir(inum , const char *, mode_t , inum &);
   int symlink(inum, const char *, mode_t, const char *, inum &);
   
-  /** you may need to add symbolic link related methods here.*/
+  // directory entry parse
+  static int deDir(std::string buf, std::list<dirent> &);
+  static int enDir(const std::list<dirent> &, std::string &);
+  static int rmdirentry(std::list<dirent> &, std::string, inum &);
+  int adddirentry(std::list<dirent> &, const std::string , const inum);
 };
 
 #endif 

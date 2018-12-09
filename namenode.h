@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <set>
 #include <unordered_map>
+#include "lock_client_cache.h"
 
 class extent_client;
 class lock_client;
@@ -54,6 +55,7 @@ private:
 
   /* Add your member variables/functions here */
 private:
+  void bids2lbs(const std::list<blockid_t> list, std::list<LocatedBlock>& lbs, const unsigned long long s);
   void GetFileInfo();
   bool RecursiveLookup(const std::string &path, yfs_client::inum &ino, yfs_client::inum &last);
   bool RecursiveLookup(const std::string &path, yfs_client::inum &ino);
