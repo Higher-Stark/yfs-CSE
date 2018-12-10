@@ -53,9 +53,15 @@ private:
   DatanodeIDProto master_datanode;
   std::map<yfs_client::inum, uint32_t> pendingWrite;
 
+  std::set<DatanodeIDProto> alive;
+  std::map<DatanodeIDProto, int> heartbeats;
+  std::map<DatanodeIDProto, int> dnVer; // datanode version
+  std::map<blockid_t, int> blkVer;  // block version
   /* Add your member variables/functions here */
 private:
   void bids2lbs(const std::list<blockid_t> list, std::list<LocatedBlock>& lbs, const unsigned long long s);
+  void recover(DatanodeIDProto id);
+  void checkLiving();
   void GetFileInfo();
   bool RecursiveLookup(const std::string &path, yfs_client::inum &ino, yfs_client::inum &last);
   bool RecursiveLookup(const std::string &path, yfs_client::inum &ino);

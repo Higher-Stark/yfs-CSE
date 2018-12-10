@@ -25,6 +25,7 @@ private:
   bool WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const std::string &buf);
   bool SendHeartbeat();
 
+  void beat();
   /* Feel free to add your member variables/functions here */
 public:
   int init(const std::string &extent_dst, const std::string &namenode, const struct sockaddr_in *bindaddr);

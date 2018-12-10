@@ -554,8 +554,10 @@ int yfs_client::deDir(std::string buf, std::list<dirent> & list)
     list.clear();
     int r = OK;
 
+    #if _DEBUG_
     fprintf(stdout, "[ Info ] deDir: buf: %s\n", buf.c_str());
     fflush(stdout);
+    #endif
 
     std::string::size_type pos1 = 0;
     std::string::size_type pos2 = buf.find("\\;", pos1);
@@ -585,8 +587,10 @@ int yfs_client::enDir(const std::list<dirent> &list, std::string &buf)
     }
     buf = stream.str();
     
+    #if _DEBUG_
     std::cout << "[ Info ] enDir: buf:" << buf << std::endl;
     std::cout.flush();
+    #endif
 
     return OK;
 }
@@ -612,8 +616,10 @@ int yfs_client::rmdirentry(std::list<dirent> &list, std::string name, inum &ino_
 
 int yfs_client::adddirentry(std::list<dirent> &list, const std::string name, const inum ino)
 {
+    #if _DEBUG_
     std::cout << "[ Info ] add dir entry: name: " << name << "; inum: " << ino << std::endl;
     std::cout.flush();
+    #endif
 
     struct dirent en;
     en.name = name;

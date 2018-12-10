@@ -10,6 +10,9 @@
 #include "extent_client.h"
 #include <vector>
 
+#ifndef _DEBUG_
+#define _DEBUG_ 1
+#endif
 
 class yfs_client {
   extent_client *ec;

@@ -49,7 +49,25 @@ int DataNode::init(const string &extent_dst, const string &namenode, const struc
   #if _DEBUG_
   fprintf(stdout, "[ Info ] root initialized\n");
   #endif
+
+  // send heartbeat
+  NewThread(this, &DataNode::beat);
   return 0;
+}
+
+void DataNode::beat()
+{
+  int delay = 1;
+  while (true) {
+    if (SendHeartbeat()) {
+      delay = 1;
+      sleep(delay);
+    }
+    else {
+      sleep(delay);
+      delay *= 2;
+    }
+  }
 }
 
 /*

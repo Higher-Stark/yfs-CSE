@@ -22,6 +22,7 @@ void NameNode::init(const string &extent_dst, const string &lock_dst) {
   #if _DEBUG_
   fprintf(stdout, "[ Info ] init root OK\n");
   fflush(stdout);
+  NewThread(this, &NameNode::checkLiving);
   #endif
 }
 
@@ -30,7 +31,7 @@ void NameNode::bids2lbs(const std::list<blockid_t> list, std::list<LocatedBlock>
   unsigned long long rest = size;
   size_t i = 0;
   for (std::list<blockid_t>::const_iterator it = list.cbegin(); it != list.cend(); it++, i++) {
-    LocatedBlock l(*it, i*BLOCK_SIZE, MIN(BLOCK_SIZE, rest), master_datanode);
+    LocatedBlock l(*it, i*BLOCK_SIZE, MIN(BLOCK_SIZE, rest), GetDatanodes());
     rest -= MIN(BLOCK_SIZE, rest);
     lbs.push_back(l);
   }
@@ -77,7 +78,14 @@ NameNode::LocatedBlock NameNode::AppendBlock(yfs_client::inum ino) {
   }
   uint64_t bSize = a.size % BLOCK_SIZE;
   if (bSize == 0) bSize = BLOCK_SIZE;
-  return LocatedBlock(bid, a.size, bSize, master_datanode);
+  std::list<DatanodeIDProto> dns = GetDatanodes();
+  int latest = dnVer[master_datanode] + 1;
+  for (std::list<DatanodeIDProto>::iterator it = dns.begin(); it != dns.end(); it++) {
+    dnVer[*it] = latest;
+  }
+  blkVer[bid] = latest;
+  LocatedBlock lb(bid, a.size, bSize, dns);
+  return lb;
 }
 
 bool NameNode::Rename(yfs_client::inum src_dir_ino, string src_name, yfs_client::inum dst_dir_ino, string dst_name) {
@@ -258,11 +266,141 @@ bool NameNode::Unlink(yfs_client::inum parent, string name, yfs_client::inum ino
 }
 
 void NameNode::DatanodeHeartbeat(DatanodeIDProto id) {
+  #if _DEBUG_
+  std::cout << "[ Info ] Datanode Heart Beat: datanode hostname: " << id.hostname() << std::endl;
+  std::cout.flush();
+  #endif
+  if (heartbeats.find(id) == heartbeats.end()) {
+    heartbeats[id] = 3;
+  }
+  else
+  heartbeats[id] += 1;
+  if (dnVer[id] < dnVer[master_datanode]) {
+    #if _DEBUG_
+    std::cout << "[ Info ] Datanode Heart Beat: recover datanode " << id.hostname() << std::endl;
+    std::cout.flush();
+    #endif
+    NewThread(this, &NameNode::recover, id);
+  }
+  else if (dnVer[id] == dnVer[master_datanode]) {
+    if (alive.find(id) == alive.end()) alive.insert(id);
+  }
+  else {
+    std::cout << "[ Warning ] Datanode Heart Beat: master node version falls behind" << std::endl;
+    std::cout.flush();
+  }
 }
 
 void NameNode::RegisterDatanode(DatanodeIDProto id) {
+  #if _DEBUG_
+  std::cout << "[ Info ] Register Datanode: IP addr" << id.ipaddr() 
+            << ", hostname: " << id.hostname()
+            << ", port: " << id.infoport()
+            << std::endl;
+  std::cout.flush();
+  #endif
+  
+  if (id.datanodeuuid().compare(master_datanode.datanodeuuid()) == 0) {
+    alive.insert(id);
+    dnVer.insert(make_pair(id, 0));
+    return;
+  }
+
+  if (alive.find(id) == alive.end()) {
+    dnVer.insert(make_pair(id, 0));
+  }
+  if (dnVer[id] < dnVer[master_datanode]) {
+    #if _DEBUG_
+    std::cout << "[ Info ] Recover data node | hostname: " << id.hostname() 
+    << ", version: " << dnVer[id] << ", (latest version: " 
+    << dnVer[master_datanode] << std::endl;
+    #endif
+    NewThread(this, &NameNode::recover, id);
+  }
+  else if (dnVer[id] > dnVer[master_datanode]) {
+    std::cout << "[ Warning ] Register data node | master node version falls behind."
+    << " Master version: " << dnVer[master_datanode] << ", another data node version: "
+    << dnVer[id] << std::endl;
+  }
+  else {
+    alive.insert(id);
+    heartbeats.insert(make_pair(id, 3));
+  }
+  return;
 }
 
 list<DatanodeIDProto> NameNode::GetDatanodes() {
-  return list<DatanodeIDProto>();
+  return std::list<DatanodeIDProto>(alive.begin(), alive.end());
+}
+
+void NameNode::recover(DatanodeIDProto id)
+{
+  #if _DEBUG_
+  std::cout << "[ Info ] Recover Data Node: hostname: "
+            << id.hostname() << std::endl;
+  std::cout.flush();
+  #endif
+
+  int ver = dnVer[id];
+  bool catchup = true;
+  for (std::map<blockid_t, int>::iterator it = blkVer.begin(); it != blkVer.end(); it++) {
+    if (it->second > ver) {
+      bool r = ReplicateBlock(it->first, master_datanode, id);
+      if (r) {
+        std::cout << "[ Info ] Recover | data node hostname[ " << id.hostname()
+        << " ] block " << it->first << " recover success" << std::endl;
+        std::cout.flush();
+      }
+      else {
+        std::cout << "[ Warning ] Recover | data node hostname[ " << id.hostname()
+        << " ] block " << it->first << " recover fail" << std::endl;
+        std::cout.flush();
+        catchup = false;
+      }
+    }
+  }
+  if (catchup) {
+    #if _DEBUG_
+    std::cout << "[ Info ] Recover | data node recover complete, hostname: "
+    << id.hostname() << std::endl;
+    std::cout.flush();
+    #endif
+    // TODO: block update during recover
+    dnVer[id] = dnVer[master_datanode];
+    alive.insert(id);
+  }
+  else {
+    #if _DEBUG_
+    std::cout << "[ Info ] Recover | data node does not catch up, hostname: "
+    << id.hostname() << std::endl;
+    std::cout.flush();
+    #endif
+  }
+}
+
+void NameNode::checkLiving()
+{
+  while (true) {
+    for (std::map<DatanodeIDProto, int>::iterator it = heartbeats.begin();
+     it != heartbeats.end(); it++) {
+      if (it->second <= 0) {
+#if _DEBUG_
+        std::cout << "[ Info ] Data Node is dead: hostname: " << it->first.hostname() << std::endl;
+        std::cout.flush();
+#endif
+
+        alive.erase(it->first);
+        heartbeats.erase(it);
+        continue;
+      }
+      else {
+        it->second -= 1;
+#if _DEBUG_
+        std::cout << "[ Info ] Data Node is alive: hostname: " << it->first.hostname() << std::endl;
+        std::cout.flush();
+#endif
+      }
+    }
+    sleep(1);
+  }
 }
