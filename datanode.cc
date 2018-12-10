@@ -82,7 +82,7 @@ bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &b
   /* Your lab4 part 2 code */
   // TODO:
   #if _DEBUG_
-  fprintf(stdout, "Read block %d\n", bid);
+  fprintf(stdout, "[ Info ] Read block %d [%ld:%ld]\n", bid, offset, len);
   fflush(stdout);
   #endif
 
@@ -96,12 +96,11 @@ bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &b
     return false;
   }
 
-  if (offset + len > tmpbuf.size()) {
+  if (offset > tmpbuf.size()) {
     fprintf(stdout, "[ Warning ] 1001: out of string boundary\n");
+    buf = "";
   }
-  buf = tmpbuf.substr(offset, len);
-  fprintf(stdout, "[ Info ] read from block %d [%ld:%ld]: %s\n", bid, offset, len, buf.c_str());
-  fflush(stdout);
+  else buf = tmpbuf.substr(offset, len);
   return true;
 }
 
@@ -114,7 +113,7 @@ bool DataNode::WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const st
   /* Your lab4 part 2 code */
   // TODO:
   #if _DEBUG_
-  fprintf(stdout, "Write block %d, offset: %ld, len: %ld, buf: %s, buf size: %ld\n", bid, offset, len, buf.c_str(), buf.size());
+  fprintf(stdout, "[ Info ] Write Block %d, offset: %ld, len: %ld, buf size: %ld\n", bid, offset, len, buf.size());
   fflush(stdout);
   #endif
 
@@ -127,15 +126,15 @@ bool DataNode::WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const st
     #endif
     return false;
   }
-  #if _DEBUG_
+  /*#if _DEBUG_
   fprintf(stdout, "[ Info ] old content of block %d: %s\n", bid, oldbuf.c_str());
   fflush(stdout);
-  #endif
+  #endif*/
   string newbuf = oldbuf.substr(0, offset) + buf + oldbuf.substr(offset + len);
-  #if _DEBUG_
+  /*#if _DEBUG_
   fprintf(stdout, "[ Info ] new content of block %d: %s\n", bid, newbuf.c_str());
   fflush(stdout);
-  #endif
+  #endif*/
   ret = ec->write_block(bid, newbuf);
   if (ret != extent_protocol::OK) {
     #if _DEBUG_

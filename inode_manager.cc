@@ -525,7 +525,8 @@ inode_manager::append_block(uint32_t inum, blockid_t &bid)
   }
   // update inode if necessary
   // leaving mtime update to function complete
-  if (update_inode) put_inode(inum, ino);
+  ino->size += BLOCK_SIZE;
+  put_inode(inum, ino);
   free(ino);
   return;
 }
