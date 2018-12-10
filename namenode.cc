@@ -89,7 +89,6 @@ NameNode::LocatedBlock NameNode::AppendBlock(yfs_client::inum ino) {
 }
 
 bool NameNode::Rename(yfs_client::inum src_dir_ino, string src_name, yfs_client::inum dst_dir_ino, string dst_name) {
-  // TODO: file already exists, recover src_dir
   #if _DEBUG_
   fprintf(stdout, "[ Info ] Rename: \n");
   fflush(stdout);
@@ -223,7 +222,6 @@ bool NameNode::Readdir(yfs_client::inum ino, std::list<yfs_client::dirent> &dir)
   return false;
 }
 
-// TODO: what does ino mean
 bool NameNode::Unlink(yfs_client::inum parent, string name, yfs_client::inum ino) {
   #if _DEBUG_
   printf("[ Info ] Unlink: name: %s; inum: %lld\n", name.c_str(), ino);
@@ -333,6 +331,20 @@ list<DatanodeIDProto> NameNode::GetDatanodes() {
   return std::list<DatanodeIDProto>(alive.begin(), alive.end());
 }
 
+/*
+ * function recover
+ * description: Recover a data node
+ * update all blocks which are out of date
+ * 
+ * Bug: during recovery, if some block is updated after ReplicateBlock,
+ * the function can't detect and update again
+ * Possible solution: before ReplicateBlock loop, take down latest version,
+ * replicate those blocks whose version is higher than id's version and no 
+ * higher than the taken down latest version(which maybe out of date).
+ * After loop, check whether the taken down version is still the latest
+ * version, if not, loop again
+ */
+// FIXME:
 void NameNode::recover(DatanodeIDProto id)
 {
   #if _DEBUG_
@@ -365,7 +377,6 @@ void NameNode::recover(DatanodeIDProto id)
     << id.hostname() << std::endl;
     std::cout.flush();
     #endif
-    // TODO: block update during recover
     dnVer[id] = dnVer[master_datanode];
     alive.insert(id);
   }

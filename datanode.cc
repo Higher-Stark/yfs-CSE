@@ -79,8 +79,6 @@ void DataNode::beat()
  * @buf: data read from the block
  */
 bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &buf) {
-  /* Your lab4 part 2 code */
-  // TODO:
   #if _DEBUG_
   fprintf(stdout, "[ Info ] Read block %d [%ld:%ld]\n", bid, offset, len);
   fflush(stdout);
@@ -110,8 +108,6 @@ bool DataNode::ReadBlock(blockid_t bid, uint64_t offset, uint64_t len, string &b
  * of buf, rest remains the same
  */
 bool DataNode::WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const string &buf) {
-  /* Your lab4 part 2 code */
-  // TODO:
   #if _DEBUG_
   fprintf(stdout, "[ Info ] Write Block %d, offset: %ld, len: %ld, buf size: %ld\n", bid, offset, len, buf.size());
   fflush(stdout);
@@ -126,15 +122,7 @@ bool DataNode::WriteBlock(blockid_t bid, uint64_t offset, uint64_t len, const st
     #endif
     return false;
   }
-  /*#if _DEBUG_
-  fprintf(stdout, "[ Info ] old content of block %d: %s\n", bid, oldbuf.c_str());
-  fflush(stdout);
-  #endif*/
   string newbuf = oldbuf.substr(0, offset) + buf + oldbuf.substr(offset + len);
-  /*#if _DEBUG_
-  fprintf(stdout, "[ Info ] new content of block %d: %s\n", bid, newbuf.c_str());
-  fflush(stdout);
-  #endif*/
   ret = ec->write_block(bid, newbuf);
   if (ret != extent_protocol::OK) {
     #if _DEBUG_

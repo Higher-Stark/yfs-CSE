@@ -4,7 +4,7 @@
 #define inode_h
 
 #include <stdint.h>
-#include "extent_protocol.h" // TODO: delete it
+#include "extent_protocol.h"
 
 #define DISK_SIZE  1024*1024*32
 #define BLOCK_SIZE (1024*16)

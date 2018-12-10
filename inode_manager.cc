@@ -486,7 +486,6 @@ inode_manager::remove_file(uint32_t inum)
 void
 inode_manager::append_block(uint32_t inum, blockid_t &bid)
 {
-  // TODO:
   struct inode* ino = get_inode(inum);
   if (!ino) {
     bid = -1;
@@ -540,7 +539,6 @@ inode_manager::append_block(uint32_t inum, blockid_t &bid)
 void
 inode_manager::get_block_ids(uint32_t inum, std::list<blockid_t> &block_ids)
 {
-  // TODO:
   struct inode *ino = get_inode(inum);
   if (!ino) {
     fprintf(stderr, "[ Error ] 0002: inode %d not exist\n", inum);
@@ -578,7 +576,6 @@ inode_manager::get_block_ids(uint32_t inum, std::list<blockid_t> &block_ids)
 void
 inode_manager::read_block(blockid_t id, char buf[BLOCK_SIZE])
 {
-  // TODO:
   bm->read_block(id, buf);
 }
 
@@ -591,7 +588,6 @@ inode_manager::read_block(blockid_t id, char buf[BLOCK_SIZE])
 void
 inode_manager::write_block(blockid_t id, const char buf[BLOCK_SIZE])
 {
-  // TODO:
   bm->write_block(id, buf);
 }
 
@@ -606,7 +602,6 @@ inode_manager::write_block(blockid_t id, const char buf[BLOCK_SIZE])
 void
 inode_manager::complete(uint32_t inum, uint32_t size)
 {
-  // TODO:
   struct inode* ino = get_inode(inum);
   if (!ino) {
     fprintf(stderr, "[ Error ] 0003: inode %d not exists\n", inum);
